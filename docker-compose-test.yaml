@@ -1,0 +1,161 @@
+version: '3.8'
+
+services:
+
+  php-fpm:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: test
+    container_name: "test-app"
+    environment:
+      MYSQL_HOST: mysql
+      REDIS_HOST: redis
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_PORT: ${REDIS_PORT}
+    ports:
+    - "9000:9000"
+    networks:
+      - mynetwork
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+      args:
+        SERVICE: php-fpm
+    container_name: "test-nginx"
+    ports:
+      - "80:80"
+    networks:
+      - mynetwork
+
+  mysql:
+    image: mysql/mysql-server
+    restart: on-failure
+    container_name: "test-mysql"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+    networks:
+      - mynetwork
+    volumes:
+      - ./mysql-data:/var/lib/mysql
+
+#  adminer:
+#    image: adminer
+#    restart: on-failure
+#    container_name: "test-adminer"
+#    environment:
+#      ADMINER_DEFAULT_SERVER: ${ADMINER_DEFAULT_SERVER}
+#      MYSQL_HOST: ${MYSQL_USER}
+#      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+#      ADMINER_DESIGN: ${ADMINER_DESIGN}
+#    ports:
+#      - 8888:8080
+#    networks:
+#      - mynetwork
+#
+#  swagger-ui:
+#    image: swaggerapi/swagger-ui:v4.14.2
+#    restart: on-failure
+#    container_name: "test-swaggerui"
+#    environment:
+#      - SUPPORTED_SUBMIT_METHODS=["get","post","put","patch","delete"]
+#      - URLS=[
+#        {"name":"Payments", "url":"http://localhost"}
+#        ]
+#      - URLS_PRIMARY_NAME=Payments
+#      - VALIDATOR_URL=none
+#      - DOM_ID=#swagger-ui
+#      - DEEP_LINKING=true
+#      - QUERY_CONFIG_ENABLED=true
+#      - FILTER=true
+#      - DISPLAY_REQUEST_DURATION=true
+#      - DEFAULT_MODELS_EXPAND_DEPTH=10
+#      - DEFAULT_MODEL_EXPAND_DEPTH=10
+#      - PERSIST_AUTHORIZATION=true
+#      - TRY_IT_OUT_ENABLED=true
+#    expose:
+#      - 8080
+#    ports:
+#      - "8080:8080"
+#    networks:
+#      - mynetwork
+
+#  rabbitmq:
+#    image: rabbitmq:3.11-management-alpine
+#    restart: on-failure
+#    container_name: "test-rabbitmq"
+#    environment:
+#      RABBITMQ_DEFAULT_VHOST: "/"
+#      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+#      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+#    healthcheck:
+#      test: [ 'CMD', 'rabbitmq-diagnostics', '-q', 'ping' ]
+#      interval: 30s
+#      timeout: 30s
+#      retries: 3
+#    expose:
+#      - 15672
+#      - 5672
+#    ports:
+#      - 5672:5672  # AMQP
+#      - 15672:15672  # RabbitMQ management UI
+#    networks:
+#      - mynetwork
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    hostname: redis-comander
+    restart: on-failure
+    container_name: "test-redis-commander"
+    environment:
+      REDIS_HOSTS: local:redis:6379  # Connect to the local Redis server
+    expose:
+      - 8081
+    ports:
+      - 8081:8081
+    networks:
+      - mynetwork
+
+#  ngrok:
+#      image: ngrok/ngrok:latest
+#      restart: unless-stopped
+#      command:
+#        - "start"
+#        - "--all"
+#        - "--config"
+#        - "/etc/ngrok.yml"
+#      volumes:
+#        - ./config/ngrok.yml:/etc/ngrok.yml
+#      ports:
+#        - 4040:4040
+
+  redis:
+    image: redis:6.2
+    restart: on-failure
+    container_name: "test-redis"
+    command: [ "redis-server", "--aclfile", "/etc/redis/acl.conf" ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+    volumes:
+      - ./redis/config/acl.conf:/etc/redis/acl.conf
+    networks:
+      - mynetwork
+
+networks:
+  mynetwork:
+    driver: bridge
+
+volumes:
+  mysql-data:
